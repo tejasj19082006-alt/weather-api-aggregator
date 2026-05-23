@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
+from typing import Optional
 from app.services.weather import WeatherService
 from app.schemas import WeatherResponse, ForecastResponse
 
@@ -13,26 +14,27 @@ def home():
     return {"message": "Weather API Aggregator Service Layer is Active."}
 
 @app.get("/api/v1/weather/{city}", response_model=WeatherResponse, tags=["Weather"])
-async def fetch_city_weather(city: str):
+async def fetch_city_weather(city: str, state: Optional[str] = Query(None, description="Optional state name")):
     """
-    Retrieve current weather for a specific city and validate it against the WeatherResponse schema.
-    Example: http://127.0.0.1:8000/api/v1/weather/mumbai
+    Retrieve current weather for a specific city (with an optional state parameter).
+    Example: http://127.0.0.1:8000/api/v1/weather/mumbai?state=maharashtra
     """
-    result = await weather_service.get_weather_by_city(city)
+    # Append state to the query if the user provided it
+    search_query = f"{city},{state}" if state else city
+    result = await weather_service.get_weather_by_city(search_query)
     
-    # Handle API or Client errors safely
     if result.get("error"):
         raise HTTPException(
             status_code=result.get("status_code", 400), 
             detail=result.get("message", "An error occurred")
         )
         
-    # Extract the raw OpenWeatherMap data from your service result
     raw_data = result["data"]
     
-    # Map the messy raw JSON into our clean Pydantic schema format
+    # Map the JSON. We also return the state if the user provided it.
     mapped_data = {
         "city": raw_data["name"],
+        "state": state.title() if state else None,
         "temperature": raw_data["main"]["temp"],
         "humidity": raw_data["main"]["humidity"],
         "description": raw_data["weather"][0]["description"],
@@ -42,31 +44,27 @@ async def fetch_city_weather(city: str):
     return mapped_data
 
 @app.get("/api/v1/forecast/{city}", response_model=ForecastResponse, tags=["Forecast"])
-async def fetch_city_forecast(city: str, days: int = 5):
+async def fetch_city_forecast(city: str, days: int = 5, state: Optional[str] = Query(None, description="Optional state name")):
     """
     Retrieve a multi-day weather forecast for a specific city.
-    Example: http://127.0.0.1:8000/api/v1/forecast/mumbai?days=5
+    Example: http://127.0.0.1:8000/api/v1/forecast/mumbai?days=5&state=maharashtra
     """
-    # Assuming you create a get_forecast_by_city method in your WeatherService!
-    # result = await weather_service.get_forecast_by_city(city, days)
+    search_query = f"{city},{state}" if state else city
+    result = await weather_service.get_forecast_by_city(search_query, days)
     
-    # if result.get("error"):
-    #     raise HTTPException(status_code=result["status_code"], detail=result["message"])
+    if result.get("error"):
+        raise HTTPException(
+            status_code=result.get("status_code", 400), 
+            detail=result.get("message", "An error occurred")
+        )
     
-    # raw_forecast = result["data"]
+    forecast_data = result["data"]
     
-    # --- PLACEHOLDER RETURN ---
-    # Because OpenWeatherMap's forecast data structure is complex, 
-    # here is dummy data formatted to match your ForecastResponse schema 
-    # so your Swagger UI works immediately while you build the actual service method.
+    # This structure exactly matches the ForecastResponse Pydantic Schema!
+    # No more 422 errors.
     return {
-        "city": city.capitalize(),
-        "forecast_days": days,
-        "forecasts": [
-            {
-                "date": "2024-05-25",
-                "temperature": 31.0,
-                "description": "clear sky"
-            }
-        ]
+        "city": city.title(),
+        "state": state.title() if state else None,
+        "forecast_days": len(forecast_data),
+        "forecasts": forecast_data
     }
