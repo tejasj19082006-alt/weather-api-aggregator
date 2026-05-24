@@ -1,91 +1,57 @@
 import os
 import httpx
 from dotenv import load_dotenv
+from cachetools import TTLCache
 
 load_dotenv()
 
 class WeatherService:
     def __init__(self):
-        # Grab the API key securely from the environment variables
         self.api_key = os.getenv("OPENWEATHER_API_KEY")
-        
-        # Changed base_url to the root version so we can use both /weather and /forecast endpoints
         self.base_url = "https://api.openweathermap.org/data/2.5"
-        
-        if not self.api_key:
-            raise ValueError("CRITICAL: OPENWEATHER_API_KEY is missing from the environment!")
+        # Cache for 10 minutes (600 seconds), max 100 entries
+        self.cache = TTLCache(maxsize=100, ttl=600)
 
-    async def get_weather_by_city(self, location_query: str):
-        """
-        Fetches live weather data from OpenWeatherMap.
-        Accepts either "City" or "City,State".
-        """
-        params = {
-            "q": location_query,
-            "appid": self.api_key,
-            "units": "metric"  # Keeps temperatures in Celsius
-        }
+    async def _fetch_from_api(self, endpoint: str, params: dict):
+        """Helper to handle HTTP requests safely."""
+        params["appid"] = self.api_key
+        params["units"] = "metric"
         
         async with httpx.AsyncClient() as client:
-            response = await client.get(f"{self.base_url}/weather", params=params)
-            
-            if response.status_code != 200:
-                return {
-                    "error": True,
-                    "status_code": response.status_code,
-                    "message": response.json().get("message", "Failed to fetch weather data")
-                }
-                
-            return {
-                "error": False,
-                "data": response.json()
-            }
+            try:
+                response = await client.get(f"{self.base_url}/{endpoint}", params=params)
+                if response.status_code != 200:
+                    return {"error": True, "status_code": response.status_code, "message": "External API error"}
+                return {"error": False, "data": response.json()}
+            except Exception as e:
+                return {"error": True, "status_code": 500, "message": str(e)}
 
-    async def get_forecast_by_city(self, location_query: str, days: int = 5):
-        """
-        Fetch and transform the 5-day forecast from OpenWeatherMap.
-        Accepts either "City" or "City,State".
-        """
-        params = {
-            "q": location_query,
-            "appid": self.api_key,
-            "units": "metric"
-        }
-        
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{self.base_url}/forecast", params=params)
-            
-            if response.status_code != 200:
-                return {
-                    "error": True,
-                    "status_code": response.status_code,
-                    "message": response.json().get("message", "Failed to fetch forecast data")
-                }
-            
-            raw_data = response.json()
-            
-            # --- TRANSFORMATION LOGIC ---
-            daily_forecasts = []
-            seen_dates = set()
-            
-            for item in raw_data.get("list", []):
-                # dt_txt looks like "2024-05-25 12:00:00"
-                date_str, time_str = item["dt_txt"].split(" ")
-                
-                # Grab the 12:00:00 PM forecast for each day
-                if date_str not in seen_dates and time_str == "12:00:00":
-                    daily_forecasts.append({
-                        "date": date_str,
-                        "temperature": item["main"]["temp"],
-                        "description": item["weather"][0]["description"]
-                    })
-                    seen_dates.add(date_str)
-                    
-                # Stop parsing if we reach the requested number of days
-                if len(daily_forecasts) == days:
-                    break
-                    
-            return {
-                "error": False,
-                "data": daily_forecasts
-            }
+    async def get_weather_by_city(self, query: str):
+        if query in self.cache:
+            return {"error": False, "data": self.cache[query]}
+
+        result = await self._fetch_from_api("weather", {"q": query})
+        if not result["error"]:
+            self.cache[query] = result["data"]
+        return result
+
+    async def get_forecast_by_city(self, query: str, days: int = 5):
+        # Forecasts are complex, caching the raw result
+        cache_key = f"forecast_{query}"
+        if cache_key in self.cache:
+            return {"error": False, "data": self.cache[cache_key]}
+
+        result = await self._fetch_from_api("forecast", {"q": query})
+        if not result["error"]:
+            # Basic processing: simplify forecast to 5 entries
+            raw_list = result["data"].get("list", [])
+            processed = []
+            for item in raw_list[:days]:
+                processed.append({
+                    "date": item.get("dt_txt", "N/A"),
+                    "temperature": item.get("main", {}).get("temp", 0),
+                    "description": item.get("weather", [{}])[0].get("description", "N/A")
+                })
+            self.cache[cache_key] = processed
+            return {"error": False, "data": processed}
+        return result

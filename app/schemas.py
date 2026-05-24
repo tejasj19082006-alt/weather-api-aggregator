@@ -1,25 +1,21 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import List, Optional
 
-# --- Weather Schemas ---
-
 class WeatherResponse(BaseModel):
-    city: str = Field(..., example="Mumbai", description="Name of the requested city")
-    state: Optional[str] = Field(None, example="Maharashtra", description="Optional name of the state or region")
-    temperature: float = Field(..., example=29.5, description="Current temperature in Celsius")
-    humidity: int = Field(..., example=62, description="Humidity percentage")
-    description: str = Field(..., example="few clouds", description="Brief weather condition")
-    wind_speed: float = Field(..., example=4.12, description="Wind speed in meters per second")
-
-# --- Forecast Schemas ---
+    city: str
+    state: Optional[str] = None
+    temperature: float
+    humidity: int
+    description: str
+    wind_speed: float
 
 class DailyForecast(BaseModel):
-    date: str = Field(..., example="2026-05-25", description="Date of the forecast")
-    temperature: float = Field(..., example=31.0, description="Forecasted temperature")
-    description: str = Field(..., example="clear sky", description="Forecasted condition")
+    date: str
+    temperature: float
+    description: str
 
 class ForecastResponse(BaseModel):
-    city: str = Field(..., example="Mumbai", description="Name of the requested city")
-    state: Optional[str] = Field(None, example="Maharashtra", description="Optional name of the state or region")
-    forecast_days: int = Field(..., example=5, description="Number of days in the forecast")
-    forecasts: List[DailyForecast] = Field(..., description="List of simplified daily weather forecasts")
+    city: str
+    state: Optional[str] = None
+    forecast_days: int
+    forecasts: List[DailyForecast]

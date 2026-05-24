@@ -59,3 +59,17 @@
   * 📂 **Files Changed & How:** Modified `app/main.py` inside the `/api/v1/forecast/{city}` route. Instead of passing the raw list, we explicitly packed the data into a mapped dictionary: `{"city": city, "state": state, "forecast_days": 5, "forecasts": forecast_data}`. This matched our Pydantic schema perfectly and yielded a flawless `200 OK`.
 
 ```
+---
+
+## ⚡ Week 5: Performance Optimization & In-Memory Caching
+**Objective:** Reduce redundant external API calls, minimize latency, and protect our application from rate-limiting by implementing a high-speed data caching layer.
+
+### ✨ Key Milestones Achieved:
+* **In-Memory Caching Implementation:** Integrated the `cachetools` library to establish a high-performance, short-term memory layer within our application. This dramatically reduces response times for frequently requested cities by bypassing network latency.
+  * 📂 **Files Changed & How:** Updated `requirements.txt` to include `cachetools`. Modified `app/services/weather.py` to initialize a `TTLCache` (Time-To-Live Cache) within the `WeatherService` class constructor.
+* **Cache Expiration Strategy (TTL):** Configured the cache with a strict `ttl=600` (10 minutes) and a `maxsize=100`. This ensures our application returns near-instant responses for recent queries while automatically purging stale weather data to prevent memory leaks and ensure users receive reasonably current forecasts.
+  * 📂 **Files Changed & How:** Adjusted the fetch logic in `app/services/weather.py`. Before making an HTTP request to OpenWeatherMap, the app now evaluates `if query in self.cache:`. If true, it immediately returns the data from RAM.
+* **Input Sanitization & Error Prevention:** Implemented defensive programming techniques to automatically clean user inputs, neutralizing common errors (like trailing spaces causing `404 Not Found` API crashes).
+  * 📂 **Files Changed & How:** Modified the endpoint functions in `app/main.py`. Applied the `.strip()` method to the incoming `city` and `state` parameters before passing them to the service layer, guaranteeing clean string queries.
+* **Defensive JSON Parsing:** Hardened our external data parsing logic against unexpected API structural changes or missing data fields.
+  * 📂 **Files Changed & How:** Updated the dictionary extraction logic in `app/services/weather.py` to utilize the `.get()` method heavily with safe fallback defaults, ensuring our app degrades gracefully instead of crashing with a `500 Internal Server Error` if OpenWeatherMap omits a field like `wind_speed`.
