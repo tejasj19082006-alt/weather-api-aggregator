@@ -63,6 +63,8 @@
 
 ---
 
+---
+
 ## ⚡ Week 5: Performance Optimization & In-Memory Caching
 **Objective:** Reduce redundant external API calls, minimize latency, and protect our application from rate-limiting by implementing a high-speed data caching layer.
 
@@ -89,7 +91,7 @@
 * **Timeouts & Hanging Prevention:** Configured a strict `10.0` second timeout on the asynchronous HTTP client (`httpx.AsyncClient(timeout=10.0)`). This prevents our main thread from hanging indefinitely if the external weather provider experiences severe latency.
   * 📂 **Files Changed & How:** Modified `app/services/weather.py` to include the `timeout` parameter in the `httpx.AsyncClient` context manager.
 
-  ---
+---
 
 ## 🧪 Week 7: Automated Testing & Documentation
 **Objective:** Ensure application reliability, prevent regressions, and document the API through comprehensive automated unit testing and mock external integrations.
@@ -100,3 +102,4 @@
 * **External API Mocking (`unittest.mock`):** Engineered decoupled tests using the `@patch` decorator to mock the `WeatherService`. This allows the testing suite to execute instantaneously without consuming actual API rate limits or relying on live internet connections.
   * 📂 **Files Changed & How:** Configured `test_api.py` to inject simulated successful payloads, `404 Not Found` conditions, and `401 Unauthorized` responses directly into the routing layer.
 * **Cache State Validation:** Wrote explicit unit tests to verify the integrity and correct allocation of the `TTLCache` in-memory dictionary.
+  * 📂 **Files Changed & How:** Added logic to `test_api.py` to test the internal dictionary allocation without triggering HTTP requests.
