@@ -73,3 +73,15 @@
   * 📂 **Files Changed & How:** Modified the endpoint functions in `app/main.py`. Applied the `.strip()` method to the incoming `city` and `state` parameters before passing them to the service layer, guaranteeing clean string queries.
 * **Defensive JSON Parsing:** Hardened our external data parsing logic against unexpected API structural changes or missing data fields.
   * 📂 **Files Changed & How:** Updated the dictionary extraction logic in `app/services/weather.py` to utilize the `.get()` method heavily with safe fallback defaults, ensuring our app degrades gracefully instead of crashing with a `500 Internal Server Error` if OpenWeatherMap omits a field like `wind_speed`.
+
+  ---
+
+## 🛡️ Week 6: Error Handling & System Resilience
+**Objective:** Fortify the application against network instability, rate limits, and external provider failures by implementing rigorous `try-except` blocks and appropriate HTTP status code mappings.
+
+### ✨ Key Milestones Achieved:
+* **Explicit HTTP Status Code Mapping:** Upgraded the service layer to intercept specific failure codes from OpenWeatherMap and translate them into semantically correct HTTP responses for our users. Implemented dedicated handling for `401 Unauthorized` (Bad API Key), `404 Not Found` (Invalid City), and `429 Too Many Requests` (Rate Limiting).
+  * 📂 **Files Changed & How:** Modified the `_fetch_from_api` function in `app/services/weather.py` to evaluate `response.status_code` prior to attempting JSON parsing.
+* **Network Exception Isolation (`try-except`):** Implemented comprehensive `try-except` blocks using the `httpx` exception hierarchy to catch physical network failures before they crash the ASGI server.
+  * 📂 **Files Changed & How:** Updated `app/services/weather.py`. Explicitly caught `httpx.ConnectTimeout` (returning a `504 Gateway Timeout`) and `httpx.ConnectError` (returning a `503 Service Unavailable`), ensuring the application fails gracefully during DNS or provider outages.
+* **Timeouts & Hanging Prevention:** Configured a strict `10.0` second timeout on the asynchronous HTTP client (`httpx.AsyncClient(timeout=10.0)`). This prevents our main thread from hanging indefinitely if the external weather provider experiences severe latency.
